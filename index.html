@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Step Counter">
+  <title>Step Counter</title>
+  <style>
+    :root {
+      --bg:         #F2F2F7;
+      --card-bg:    #FFFFFF;
+      --label:      #1C1C1E;
+      --secondary:  #8E8E93;
+      --separator:  #E5E5EA;
+      --tint:       #007AFF;
+      --red:        #FF3B30;
+      --orange:     #FF9500;
+      --yellow:     #FFCC00;
+      --green:      #34C759;
+      --radius:     16px;
+      --font:       -apple-system, 'SF Pro Rounded', 'SF Pro Display', sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:        #000000;
+        --card-bg:   #1C1C1E;
+        --label:     #FFFFFF;
+        --secondary: #8E8E93;
+        --separator: #38383A;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--label);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Screens ── */
+    .screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px 32px;
+      text-align: center;
+      min-height: 100dvh;
+      width: 100%;
+      max-width: 430px;
+    }
+    .screen[hidden] { display: none; }
+
+    .screen-icon { font-size: 72px; line-height: 1; }
+    .screen h2 { font-size: 24px; font-weight: 700; }
+    .screen p  { font-size: 16px; color: var(--secondary); line-height: 1.5; }
+
+    /* ── Main App ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 430px;
+      padding: 0 20px 40px;
+      gap: 24px;
+    }
+    #app[hidden] { display: none; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 16px 0 4px;
+    }
+    header h1 { font-size: 22px; font-weight: 700; }
+
+    /* ── Ring ── */
+    .ring-wrapper {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      flex-shrink: 0;
+    }
+    .ring-svg { width: 100%; height: 100%; overflow: visible; }
+    .ring-progress {
+      transition: stroke-dashoffset 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  stroke 0.3s ease;
+    }
+    .ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .step-count {
+      font-size: clamp(36px, 13vw, 56px);
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1;
+      color: var(--label);
+    }
+    .step-label {
+      font-size: 14px;
+      color: var(--secondary);
+    }
+
+    /* ── Stats card ── */
+    .stats-card {
+      width: 100%;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .stat-row {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+    }
+    .stat-row + .stat-row { border-top: 1px solid var(--separator); }
+    .stat-icon {
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    .stat-label { font-size: 15px; color: var(--secondary); flex: 1; }
+    .stat-value { font-size: 15px; font-weight: 600; }
+
+    /* ── Controls ── */
+    .controls {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .sensitivity-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+    }
+    .sensitivity-row label {
+      font-size: 14px;
+      color: var(--secondary);
+      white-space: nowrap;
+    }
+    .sensitivity-row input[type=range] {
+      flex: 1;
+      accent-color: var(--tint);
+      height: 4px;
+    }
+    .sensitivity-val {
+      font-size: 13px;
+      color: var(--secondary);
+      min-width: 28px;
+      text-align: right;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 600;
+      border-radius: var(--radius);
+      padding: 14px 24px;
+      transition: opacity 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { opacity: 0.7; transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--tint);
+      color: #fff;
+      width: 100%;
+    }
+    .btn-primary.stop { background: var(--red); }
+
+    .btn-ghost {
+      background: var(--card-bg);
+      color: var(--tint);
+      font-size: 15px;
+      padding: 8px 16px;
+      border-radius: 10px;
+    }
+
+    /* ── Goal Modal ── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: flex-end;
+      z-index: 100;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal-sheet {
+      background: var(--bg);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      padding: 16px 0 40px;
+      max-height: 80dvh;
+      overflow-y: auto;
+    }
+    .modal-handle {
+      width: 36px; height: 4px;
+      background: var(--separator);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+    .modal-title {
+      font-size: 17px;
+      font-weight: 600;
+      text-align: center;
+      padding: 0 20px 16px;
+    }
+    .modal-section-label {
+      font-size: 13px;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0 20px 6px;
+    }
+    .modal-input-row {
+      display: flex;
+      align-items: center;
+      background: var(--card-bg);
+      margin: 0 0 20px;
+      padding: 12px 20px;
+      border-top: 1px solid var(--separator);
+      border-bottom: 1px solid var(--separator);
+    }
+    .modal-input-row input {
+      font-family: var(--font);
+      font-size: 17px;
+      color: var(--label);
+      background: transparent;
+      border: none;
+      outline: none;
+      flex: 1;
+    }
+    .modal-input-row span {
+      font-size: 15px;
+      color: var(--secondary);
+      margin-left: 8px;
+    }
+    .preset-list {
+      background: var(--card-bg);
+      border-top: 1px solid var(--separator);
+      border-bottom: 1px solid var(--separator);
+    }
+    .preset-btn {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 14px 20px;
+      background: none;
+      border: none;
+      border-top: 1px solid var(--separator);
+      font-family: var(--font);
+      font-size: 16px;
+      color: var(--label);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .preset-btn:first-child { border-top: none; }
+    .preset-btn:active { background: var(--separator); }
+    .preset-btn .check { margin-left: auto; color: var(--tint); font-size: 18px; }
+    .modal-save-btn {
+      margin: 16px 20px 0;
+      width: calc(100% - 40px);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- iOS 13+ permission gate -->
+  <div class="screen" id="permission-screen">
+    <div class="screen-icon">🏃</div>
+    <h2>Motion Access Required</h2>
+    <p>This pedometer uses your device's motion sensor to count steps in real time. Tap below to grant access.</p>
+    <button class="btn btn-primary" id="grant-btn" style="width:100%;max-width:320px">Enable Step Counting</button>
+  </div>
+
+  <!-- Denied fallback -->
+  <div class="screen" id="denied-screen" hidden>
+    <div class="screen-icon">⚠️</div>
+    <h2>Motion Access Denied</h2>
+    <p>To enable step counting, go to:<br><br><strong>Settings → Safari → Motion &amp; Orientation Access → Allow</strong><br><br>Then reload this page.</p>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" hidden>
+    <header>
+      <h1>Step Counter</h1>
+      <button class="btn btn-ghost" id="goal-btn">Goal: <span id="goal-display">10,000</span></button>
+    </header>
+
+    <!-- Progress ring -->
+    <div class="ring-wrapper">
+      <svg class="ring-svg" viewBox="0 0 300 300" aria-hidden="true">
+        <circle cx="150" cy="150" r="120" fill="none"
+                stroke="var(--separator)" stroke-width="22"/>
+        <circle id="ring-progress" cx="150" cy="150" r="120" fill="none"
+                stroke="#FF3B30" stroke-width="22"
+                stroke-linecap="round"
+                transform="rotate(-90 150 150)"
+                stroke-dasharray="753.98"
+                stroke-dashoffset="753.98"
+                class="ring-progress"/>
+      </svg>
+      <div class="ring-center">
+        <div class="step-count" id="step-text">0</div>
+        <div class="step-label">steps today</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-card">
+      <div class="stat-row">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-label">Goal</span>
+        <span class="stat-value" id="stat-goal">10,000 steps</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">🚶</span>
+        <span class="stat-label">Remaining</span>
+        <span class="stat-value" id="stat-remaining">10,000 steps</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-icon">📊</span>
+        <span class="stat-label">Progress</span>
+        <span class="stat-value" id="stat-progress">0%</span>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="sensitivity-row" id="sensitivity-row">
+        <label for="sensitivity-slider">Sensitivity</label>
+        <input type="range" id="sensitivity-slider"
+               min="0.7" max="2.0" step="0.1" value="1.2">
+        <span class="sensitivity-val" id="sensitivity-val">1.2</span>
+      </div>
+      <button class="btn btn-primary" id="track-btn">Start Tracking</button>
+    </div>
+  </div>
+
+  <!-- Goal editor modal -->
+  <div class="modal-backdrop" id="goal-modal" hidden>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Daily Goal</div>
+      <div class="modal-section-label">Custom</div>
+      <div class="modal-input-row">
+        <input type="number" id="goal-input" inputmode="numeric"
+               placeholder="Enter steps" min="1" max="999999">
+        <span>steps</span>
+      </div>
+      <div class="modal-section-label">Presets</div>
+      <div class="preset-list" id="preset-list"></div>
+      <button class="btn btn-primary modal-save-btn" id="goal-save-btn">Save</button>
+    </div>
+  </div>
+
+  <script>
+    // ── Constants ──────────────────────────────────────────────────────────────
+    const CIRCUMFERENCE = 2 * Math.PI * 120;  // 753.98
+    const MIN_INTERVAL  = 250;                // ms between steps
+    const PRESETS       = [5000, 7500, 10000, 12500, 15000, 20000];
+    const STORAGE_KEY   = 'pedometer';
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let state = { stepCount: 0, lastDate: todayStr(), dailyGoal: 10000, sensitivity: 1.2 };
+    let isTracking = false;
+
+    // Sensor filter state (reset on each tracking start)
+    let smoothX = 0, smoothY = 0, smoothZ = 0;
+    let gravX   = 0, gravY   = 0, gravZ   = 0;
+    let rising  = false;
+    let lastPeak = 0;
+    let prevDisplayed = 0;
+
+    // ── Storage ────────────────────────────────────────────────────────────────
+    function loadState() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {};
+      } catch { return {}; }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch { /* private browsing — in-memory only */ }
+    }
+
+    function todayStr() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function checkDayRollover() {
+      const today = todayStr();
+      if (state.lastDate !== today) {
+        state.stepCount = 0;
+        state.lastDate  = today;
+        saveState();
+      }
+    }
+
+    // ── Sensor pipeline ────────────────────────────────────────────────────────
+    function resetFilterState() {
+      smoothX = smoothY = smoothZ = 0;
+      gravX   = gravY   = gravZ   = 0;
+      rising  = false;
+    }
+
+    function handleMotion(e) {
+      checkDayRollover();
+
+      let ax, ay, az;
+      const acc = e.acceleration;
+
+      if (acc && acc.x !== null) {
+        // OS already removed gravity
+        ax = acc.x || 0;
+        ay = acc.y || 0;
+        az = acc.z || 0;
+      } else {
+        // Fallback: strip gravity with high-pass filter (α = 0.8)
+        const raw = e.accelerationIncludingGravity || { x: 0, y: 0, z: 0 };
+        const rx = raw.x || 0, ry = raw.y || 0, rz = raw.z || 0;
+        gravX = 0.8 * gravX + 0.2 * rx;
+        gravY = 0.8 * gravY + 0.2 * ry;
+        gravZ = 0.8 * gravZ + 0.2 * rz;
+        ax = rx - gravX;
+        ay = ry - gravY;
+        az = rz - gravZ;
+      }
+
+      // Low-pass smoothing (LP = 0.1)
+      smoothX = 0.1 * ax + 0.9 * smoothX;
+      smoothY = 0.1 * ay + 0.9 * smoothY;
+      smoothZ = 0.1 * az + 0.9 * smoothZ;
+
+      const mag = Math.sqrt(smoothX * smoothX + smoothY * smoothY + smoothZ * smoothZ);
+      const threshold = state.sensitivity;
+      const now = Date.now();
+
+      if (mag > threshold) {
+        rising = true;
+      } else if (rising) {
+        // Falling edge after peak
+        if (now - lastPeak > MIN_INTERVAL) {
+          state.stepCount++;
+          lastPeak = now;
+          saveState();
+          updateUI(true);
+        }
+        rising = false;
+      }
+    }
+
+    function startTracking() {
+      if (isTracking) return;
+      resetFilterState();
+      window.addEventListener('devicemotion', handleMotion, { passive: true });
+      isTracking = true;
+      const btn = document.getElementById('track-btn');
+      btn.textContent = 'Stop Tracking';
+      btn.classList.add('stop');
+    }
+
+    function stopTracking() {
+      if (!isTracking) return;
+      window.removeEventListener('devicemotion', handleMotion);
+      isTracking = false;
+      saveState();
+      const btn = document.getElementById('track-btn');
+      btn.textContent = 'Start Tracking';
+      btn.classList.remove('stop');
+    }
+
+    // ── Page visibility: pause/resume sensor on app background/foreground ──────
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (isTracking) window.removeEventListener('devicemotion', handleMotion);
+      } else {
+        if (isTracking) {
+          resetFilterState();
+          window.addEventListener('devicemotion', handleMotion, { passive: true });
+        }
+      }
+    });
+
+    // ── UI updates ─────────────────────────────────────────────────────────────
+    const CIRCUMFERENCE_VAL = CIRCUMFERENCE;
+
+    function ringColor(p) {
+      if (p < 0.40) return '#FF3B30';
+      if (p < 0.70) return '#FF9500';
+      if (p < 1.00) return '#FFCC00';
+      return '#34C759';
+    }
+
+    function updateRing() {
+      const progress  = state.dailyGoal > 0 ? Math.min(state.stepCount / state.dailyGoal, 1) : 0;
+      const offset    = CIRCUMFERENCE_VAL * (1 - progress);
+      const ring      = document.getElementById('ring-progress');
+      ring.style.strokeDashoffset = offset;
+      ring.style.stroke           = ringColor(progress);
+    }
+
+    function updateStats() {
+      const remaining = Math.max(state.dailyGoal - state.stepCount, 0);
+      const progress  = state.dailyGoal > 0 ? state.stepCount / state.dailyGoal : 0;
+
+      document.getElementById('goal-display').textContent   = state.dailyGoal.toLocaleString();
+      document.getElementById('stat-goal').textContent      = state.dailyGoal.toLocaleString() + ' steps';
+      document.getElementById('stat-remaining').textContent = remaining === 0 ? 'Goal reached! 🎉' : remaining.toLocaleString() + ' steps';
+      document.getElementById('stat-progress').textContent  = Math.round(progress * 100) + '%';
+
+      const progEl = document.getElementById('stat-progress');
+      progEl.style.color = ringColor(Math.min(progress, 1));
+    }
+
+    let animFrame = null;
+    function animateNumber(from, to) {
+      if (animFrame) cancelAnimationFrame(animFrame);
+      const el    = document.getElementById('step-text');
+      const dur   = 400;
+      const start = performance.now();
+      function tick(now) {
+        const t    = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        el.textContent = Math.round(from + (to - from) * ease).toLocaleString();
+        if (t < 1) animFrame = requestAnimationFrame(tick);
+        else el.textContent = to.toLocaleString();
+      }
+      animFrame = requestAnimationFrame(tick);
+    }
+
+    function updateUI(animate = false) {
+      if (animate) {
+        animateNumber(prevDisplayed, state.stepCount);
+        prevDisplayed = state.stepCount;
+      } else {
+        document.getElementById('step-text').textContent = state.stepCount.toLocaleString();
+        prevDisplayed = state.stepCount;
+      }
+      updateRing();
+      updateStats();
+    }
+
+    // ── Goal modal ─────────────────────────────────────────────────────────────
+    function buildPresets() {
+      const list = document.getElementById('preset-list');
+      list.innerHTML = '';
+      PRESETS.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'preset-btn';
+        btn.innerHTML = `${p.toLocaleString()} steps${p === state.dailyGoal ? '<span class="check">✓</span>' : ''}`;
+        btn.addEventListener('click', () => {
+          state.dailyGoal = p;
+          saveState();
+          closeGoalModal();
+          updateUI();
+        });
+        list.appendChild(btn);
+      });
+    }
+
+    function openGoalModal() {
+      document.getElementById('goal-input').value = state.dailyGoal;
+      buildPresets();
+      document.getElementById('goal-modal').hidden = false;
+    }
+
+    function closeGoalModal() {
+      document.getElementById('goal-modal').hidden = true;
+    }
+
+    // ── Permission flow ────────────────────────────────────────────────────────
+    function showScreen(id) {
+      ['permission-screen', 'denied-screen', 'app'].forEach(s => {
+        document.getElementById(s).hidden = (s !== id);
+      });
+    }
+
+    async function requestMotionPermission() {
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const result = await DeviceMotionEvent.requestPermission();
+          return result === 'granted';
+        } catch {
+          return false;
+        }
+      }
+      return true; // Android / older iOS — assume granted
+    }
+
+    // ── Event listeners ────────────────────────────────────────────────────────
+    document.getElementById('grant-btn').addEventListener('click', async () => {
+      const granted = await requestMotionPermission();
+      if (granted) {
+        showScreen('app');
+        startTracking();
+      } else {
+        showScreen('denied-screen');
+      }
+    });
+
+    document.getElementById('track-btn').addEventListener('click', () => {
+      isTracking ? stopTracking() : startTracking();
+    });
+
+    document.getElementById('goal-btn').addEventListener('click', openGoalModal);
+
+    document.getElementById('goal-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('goal-modal')) closeGoalModal();
+    });
+
+    document.getElementById('goal-save-btn').addEventListener('click', () => {
+      const val = parseInt(document.getElementById('goal-input').value, 10);
+      if (val > 0) {
+        state.dailyGoal = val;
+        saveState();
+        updateUI();
+      }
+      closeGoalModal();
+    });
+
+    document.getElementById('sensitivity-slider').addEventListener('input', e => {
+      state.sensitivity = parseFloat(e.target.value);
+      document.getElementById('sensitivity-val').textContent = state.sensitivity.toFixed(1);
+      saveState();
+    });
+
+    // ── Bootstrap ──────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      const saved = loadState();
+      state = {
+        stepCount:   saved.stepCount   ?? 0,
+        lastDate:    saved.lastDate    ?? todayStr(),
+        dailyGoal:   saved.dailyGoal   ?? 10000,
+        sensitivity: saved.sensitivity ?? 1.2,
+      };
+      checkDayRollover();
+      prevDisplayed = state.stepCount;
+
+      document.getElementById('sensitivity-slider').value = state.sensitivity;
+      document.getElementById('sensitivity-val').textContent = state.sensitivity.toFixed(1);
+
+      updateUI();
+
+      // Apple Health mode: iOS Shortcut passes count via URL hash #steps=N
+      const hashParams = new URLSearchParams(location.hash.slice(1));
+      const hashSteps  = parseInt(hashParams.get('steps'), 10);
+      if (!isNaN(hashSteps) && hashSteps >= 0) {
+        state.stepCount = hashSteps;
+        prevDisplayed   = hashSteps;
+        updateUI();
+        showScreen('app');
+        document.getElementById('sensitivity-row').hidden = true;
+        document.getElementById('track-btn').hidden       = true;
+        document.querySelector('.step-label').textContent = 'steps · Apple Health';
+        return;
+      }
+
+      // Show permission gate on iOS 13+, else go straight to app
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        showScreen('permission-screen');
+      } else {
+        showScreen('app');
+        startTracking();
+      }
+    });
+  </script>
+</body>
+</html>
